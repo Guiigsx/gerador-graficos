@@ -5,15 +5,15 @@ const defaultChart = {
   unit: "MPa",
   source: "",
   decimals: 1,
-  font: "Arial",
+  font: "Inter",
   width: 1600,
   height: 900,
-  primaryColor: "#137fbd",
+  primaryColor: "#1268d3",
   backgroundColor: "#ffffff",
-  textColor: "#5f6669",
-  gridColor: "#dfe4e5",
-  averageColor: "#082a4b",
-  referenceColor: "#f47b20",
+  textColor: "#0b0f19",
+  gridColor: "#d9e2ef",
+  averageColor: "#0b0f19",
+  referenceColor: "#4d9cff",
   showLegend: true,
   showDataLabels: true,
   showAverage: true,
@@ -38,6 +38,7 @@ let toastTimer = 0;
 
 const canvas = document.getElementById("chart-canvas");
 const context = canvas.getContext("2d");
+const { chooseCandidate, rectsOverlap, textRect } = window.ChartLayout;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -71,7 +72,7 @@ function escapeHtml(value) {
 }
 
 function paletteColor(index) {
-  const colors = [chart.primaryColor, "#20a985", "#f59e0b", "#8b5cf6", "#e35d6a", "#476f95", "#d4782f", "#4f8a4c"];
+  const colors = [chart.primaryColor, "#0b0f19", "#4d9cff", "#75b1ff", "#263247", "#8aa8cc", "#315f91", "#b5c9e3"];
   return colors[index % colors.length];
 }
 
@@ -99,6 +100,7 @@ function bindControls() {
         chart[field] = input.value;
       }
       queueDraw();
+      if (field === "font") loadSelectedFont();
     };
     input.addEventListener("input", update);
     input.addEventListener("change", update);
@@ -269,7 +271,12 @@ function drawChart() {
 }
 
 function setFont(size, weight = 400) {
-  context.font = `${weight} ${size}px ${chart.font}, Arial, sans-serif`;
+  context.font = `${weight} ${size}px "${chart.font}", Inter, Arial, sans-serif`;
+}
+
+function loadSelectedFont() {
+  if (!document.fonts?.load) return;
+  document.fonts.load(`700 24px "${chart.font}"`).then(queueDraw).catch(() => {});
 }
 
 function drawHeader() {
@@ -335,6 +342,93 @@ function niceStep(maximum) {
   return (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
 }
 
+function horizontalReferenceGeometry(rows, area, maximum) {
+  const plotWidth = canvas.width - area.left - area.right;
+  const plotHeight = area.bottom - area.top;
+  const average = rows.reduce((total, row) => total + Number(row.value || 0), 0) / rows.length;
+  const fontSize = Math.max(13, 21 * area.scale);
+  const lines = [];
+  if (chart.showAverage) lines.push({ value: average, color: chart.averageColor, label: `${chart.averageLabel}: ${formatNumber(average)} ${chart.unit}`.trim(), dash: [] });
+  if (chart.showReference) lines.push({ value: chart.referenceValue, color: chart.referenceColor, label: `${chart.referenceLabel}: ${formatNumber(chart.referenceValue)} ${chart.unit}`.trim(), dash: [16 * area.scale, 12 * area.scale] });
+
+  const horizontalLabels = [];
+  setFont(fontSize, 800);
+  return lines.map((line, index) => {
+    const y = area.bottom - (line.value / maximum) * plotHeight;
+    const align = index % 2 === 0 ? "left" : "right";
+    const x = align === "left" ? area.left + 10 * area.scale : area.left + plotWidth - 10 * area.scale;
+    const width = context.measureText(line.label).width;
+    let labelY = y - 12 * area.scale;
+    let labelRect = textRect({ x, y: labelY, width, fontSize, align });
+    if (labelRect.top < area.top) {
+      labelY = y + fontSize + 12 * area.scale;
+      labelRect = textRect({ x, y: labelY, width, fontSize, align });
+    }
+    if (horizontalLabels.some(previous => rectsOverlap(labelRect, previous, 5 * area.scale))) {
+      labelY = y + fontSize + 12 * area.scale;
+      labelRect = textRect({ x, y: labelY, width, fontSize, align });
+    }
+    horizontalLabels.push(labelRect);
+    return {
+      ...line,
+      x,
+      y,
+      align,
+      labelY,
+      fontSize,
+      labelRect,
+      lineRect: { left: area.left, top: y - 4 * area.scale, right: area.left + plotWidth, bottom: y + 4 * area.scale }
+    };
+  });
+}
+
+function verticalReferenceGeometry(rows, area, maximum) {
+  const plotWidth = canvas.width - area.left - area.right;
+  const plotHeight = area.bottom - area.top;
+  const average = rows.reduce((total, row) => total + Number(row.value || 0), 0) / rows.length;
+  const fontSize = Math.max(13, 20 * area.scale);
+  const lines = [];
+  if (chart.showAverage) lines.push({ value: average, color: chart.averageColor, label: `${chart.averageLabel}: ${formatNumber(average)}`, dash: [] });
+  if (chart.showReference) lines.push({ value: chart.referenceValue, color: chart.referenceColor, label: `${chart.referenceLabel}: ${formatNumber(chart.referenceValue)}`, dash: [16 * area.scale, 12 * area.scale] });
+
+  setFont(fontSize, 800);
+  return lines.map((line, index) => {
+    const x = area.left + (line.value / maximum) * plotWidth;
+    const labelX = x + (index ? -12 : 12) * area.scale;
+    const labelWidth = context.measureText(line.label).width;
+    const labelAtTop = index % 2 === 0;
+    const labelY = labelAtTop ? area.top + 8 * area.scale : area.bottom - 8 * area.scale;
+    return {
+      ...line,
+      x,
+      labelX,
+      labelY,
+      labelAlign: labelAtTop ? "right" : "left",
+      fontSize,
+      labelRect: {
+        left: labelX - fontSize,
+        top: labelAtTop ? labelY : Math.max(area.top, labelY - labelWidth),
+        right: labelX + fontSize * .3,
+        bottom: labelAtTop ? Math.min(area.bottom, labelY + labelWidth) : labelY
+      },
+      lineRect: { left: x - 4 * area.scale, top: area.top, right: x + 4 * area.scale, bottom: area.top + plotHeight }
+    };
+  });
+}
+
+function referenceObstacles(references) {
+  return references.flatMap(reference => [reference.lineRect, reference.labelRect]);
+}
+
+function plotBounds(area) {
+  return {
+    left: area.left,
+    top: area.top,
+    right: canvas.width - area.right,
+    bottom: area.bottom
+  };
+}
+
 function drawBars(rows) {
   const header = drawHeader();
   const area = chartMetrics(rows, header.bottom);
@@ -344,6 +438,9 @@ function drawBars(rows) {
   const plotHeight = area.bottom - area.top;
   const slot = plotWidth / rows.length;
   const barWidth = Math.min(slot * 0.64, 220 * area.scale);
+  const references = horizontalReferenceGeometry(rows, area, maximum);
+  const obstacles = referenceObstacles(references);
+  const bounds = plotBounds(area);
 
   rows.forEach((row, index) => {
     const x = area.left + slot * index + (slot - barWidth) / 2;
@@ -359,14 +456,31 @@ function drawBars(rows) {
     fitText(row.label, x + barWidth / 2, area.bottom + 39 * area.scale, Math.max(48, slot - 10));
 
     if (chart.showDataLabels) {
-      setFont(Math.max(14, 23 * area.scale), 800);
-      const inside = barHeight > 70 * area.scale;
-      context.fillStyle = inside && row.value < maximum * .86 ? "#ffffff" : chart.textColor;
-      context.fillText(formatNumber(row.value), x + barWidth / 2, inside ? y + 34 * area.scale : y - 13 * area.scale);
+      const fontSize = Math.max(14, 23 * area.scale);
+      const label = formatNumber(row.value);
+      const center = x + barWidth / 2;
+      const barBounds = { left: x + 7 * area.scale, top: y + 6 * area.scale, right: x + barWidth - 7 * area.scale, bottom: area.bottom - 6 * area.scale };
+      setFont(fontSize, 800);
+      const selected = chooseCandidate({
+        candidates: [
+          { x: center, y: y + 34 * area.scale, align: "center", onData: true, bounds: barBounds },
+          { x: center, y: y - 13 * area.scale, align: "center", onData: false },
+          { x: center, y: y + fontSize * 2 + 18 * area.scale, align: "center", onData: true, bounds: barBounds },
+          { x: center, y: area.bottom - 18 * area.scale, align: "center", onData: true, bounds: barBounds }
+        ],
+        labelWidth: context.measureText(label).width,
+        fontSize,
+        obstacles,
+        bounds,
+        padding: 5 * area.scale
+      });
+      context.textAlign = selected.align;
+      context.fillStyle = selected.onData ? "#ffffff" : chart.textColor;
+      context.fillText(label, selected.x, selected.y);
     }
   });
 
-  drawReferenceLines(area, maximum);
+  drawReferenceLines(references, area);
   drawCartesianFooter(rows, area);
 }
 
@@ -379,6 +493,9 @@ function drawHorizontalBars(rows) {
   const plotHeight = area.bottom - area.top;
   const slot = plotHeight / rows.length;
   const barHeight = Math.min(slot * .58, 78 * area.scale);
+  const references = verticalReferenceGeometry(rows, area, maximum);
+  const obstacles = referenceObstacles(references);
+  const bounds = plotBounds(area);
 
   drawXAxis(area, maximum);
   rows.forEach((row, index) => {
@@ -394,14 +511,30 @@ function drawHorizontalBars(rows) {
     fitText(row.label, area.left - 18 * area.scale, y + barHeight / 2 + 7 * area.scale, area.left - 34 * area.scale);
 
     if (chart.showDataLabels) {
-      context.textAlign = "left";
-      setFont(Math.max(14, 21 * area.scale), 800);
-      context.fillStyle = chart.textColor;
-      context.fillText(formatNumber(row.value), area.left + width + 12 * area.scale, y + barHeight / 2 + 7 * area.scale);
+      const fontSize = Math.max(14, 21 * area.scale);
+      const label = formatNumber(row.value);
+      const baseline = y + barHeight / 2 + fontSize * .34;
+      const barBounds = { left: area.left + 7 * area.scale, top: y + 5 * area.scale, right: area.left + width - 7 * area.scale, bottom: y + barHeight - 5 * area.scale };
+      setFont(fontSize, 800);
+      const selected = chooseCandidate({
+        candidates: [
+          { x: area.left + width + 12 * area.scale, y: baseline, align: "left", onData: false },
+          { x: area.left + width - 12 * area.scale, y: baseline, align: "right", onData: true, bounds: barBounds },
+          { x: area.left + 12 * area.scale, y: baseline, align: "left", onData: true, bounds: barBounds }
+        ],
+        labelWidth: context.measureText(label).width,
+        fontSize,
+        obstacles,
+        bounds,
+        padding: 5 * area.scale
+      });
+      context.textAlign = selected.align;
+      context.fillStyle = selected.onData ? "#ffffff" : chart.textColor;
+      context.fillText(label, selected.x, selected.y);
     }
   });
 
-  drawVerticalReferenceLines(area, maximum);
+  drawVerticalReferenceLines(references, area);
   drawCartesianFooter(rows, area);
 }
 
@@ -417,6 +550,9 @@ function drawLine(rows) {
     x: rows.length === 1 ? area.left + plotWidth / 2 : area.left + index * step,
     y: area.bottom - (row.value / maximum) * plotHeight
   }));
+  const references = horizontalReferenceGeometry(rows, area, maximum);
+  const labelObstacles = referenceObstacles(references);
+  const bounds = plotBounds(area);
 
   context.beginPath();
   points.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
@@ -438,12 +574,32 @@ function drawLine(rows) {
     setFont(Math.max(14, 21 * area.scale), 500);
     fitText(rows[index].label, point.x, area.bottom + 39 * area.scale, Math.max(55, step - 12));
     if (chart.showDataLabels) {
-      setFont(Math.max(14, 21 * area.scale), 800);
-      context.fillText(formatNumber(rows[index].value), point.x, point.y - 20 * area.scale);
+      const fontSize = Math.max(14, 21 * area.scale);
+      const label = formatNumber(rows[index].value);
+      const labelAlign = index === 0 ? "left" : index === rows.length - 1 ? "right" : "center";
+      const labelX = point.x + (index === 0 ? 4 * area.scale : index === rows.length - 1 ? -4 * area.scale : 0);
+      setFont(fontSize, 800);
+      const selected = chooseCandidate({
+        candidates: [
+          { x: labelX, y: point.y - 20 * area.scale, align: labelAlign },
+          { x: labelX, y: point.y + fontSize + 20 * area.scale, align: labelAlign },
+          { x: labelX, y: point.y - fontSize - 30 * area.scale, align: labelAlign },
+          { x: labelX, y: point.y + fontSize * 2 + 30 * area.scale, align: labelAlign }
+        ],
+        labelWidth: context.measureText(label).width,
+        fontSize,
+        obstacles: labelObstacles,
+        bounds,
+        padding: 5 * area.scale
+      });
+      context.textAlign = selected.align;
+      context.fillStyle = chart.textColor;
+      context.fillText(label, selected.x, selected.y);
+      labelObstacles.push(selected.rect);
     }
   });
 
-  drawReferenceLines(area, maximum);
+  drawReferenceLines(references, area);
   drawCartesianFooter(rows, area);
 }
 
@@ -496,55 +652,42 @@ function formatTick(value) {
   return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 }
 
-function drawReferenceLines(area, maximum) {
+function drawReferenceLines(references, area) {
   const plotWidth = canvas.width - area.left - area.right;
-  const plotHeight = area.bottom - area.top;
-  const average = chart.rows.reduce((total, row) => total + Number(row.value || 0), 0) / chart.rows.length;
-  const lines = [];
-  if (chart.showAverage) lines.push({ value: average, color: chart.averageColor, label: `${chart.averageLabel}: ${formatNumber(average)} ${chart.unit}`.trim(), dash: [] });
-  if (chart.showReference) lines.push({ value: chart.referenceValue, color: chart.referenceColor, label: `${chart.referenceLabel}: ${formatNumber(chart.referenceValue)} ${chart.unit}`.trim(), dash: [16 * area.scale, 12 * area.scale] });
-  lines.forEach((line, index) => {
-    const y = area.bottom - (line.value / maximum) * plotHeight;
+  references.forEach(line => {
     context.save();
     context.setLineDash(line.dash);
     context.strokeStyle = line.color;
     context.lineWidth = 4 * area.scale;
     context.beginPath();
-    context.moveTo(area.left, y);
-    context.lineTo(area.left + plotWidth, y);
+    context.moveTo(area.left, line.y);
+    context.lineTo(area.left + plotWidth, line.y);
     context.stroke();
     context.restore();
     context.fillStyle = line.color;
-    context.textAlign = index % 2 === 0 ? "left" : "right";
-    setFont(Math.max(13, 21 * area.scale), 800);
-    context.fillText(line.label, index % 2 === 0 ? area.left + 10 * area.scale : area.left + plotWidth - 10 * area.scale, y - 12 * area.scale);
+    context.textAlign = line.align;
+    setFont(line.fontSize, 800);
+    context.fillText(line.label, line.x, line.labelY);
   });
 }
 
-function drawVerticalReferenceLines(area, maximum) {
-  const plotWidth = canvas.width - area.left - area.right;
-  const plotHeight = area.bottom - area.top;
-  const average = chart.rows.reduce((total, row) => total + Number(row.value || 0), 0) / chart.rows.length;
-  const lines = [];
-  if (chart.showAverage) lines.push({ value: average, color: chart.averageColor, label: `${chart.averageLabel}: ${formatNumber(average)}`, dash: [] });
-  if (chart.showReference) lines.push({ value: chart.referenceValue, color: chart.referenceColor, label: `${chart.referenceLabel}: ${formatNumber(chart.referenceValue)}`, dash: [16 * area.scale, 12 * area.scale] });
-  lines.forEach((line, index) => {
-    const x = area.left + (line.value / maximum) * plotWidth;
+function drawVerticalReferenceLines(references, area) {
+  references.forEach(line => {
     context.save();
     context.setLineDash(line.dash);
     context.strokeStyle = line.color;
     context.lineWidth = 4 * area.scale;
     context.beginPath();
-    context.moveTo(x, area.top);
-    context.lineTo(x, area.top + plotHeight);
+    context.moveTo(line.x, area.top);
+    context.lineTo(line.x, area.bottom);
     context.stroke();
     context.restore();
     context.save();
-    context.translate(x + (index ? -12 : 12) * area.scale, area.top + 8 * area.scale);
+    context.translate(line.labelX, line.labelY);
     context.rotate(-Math.PI / 2);
     context.fillStyle = line.color;
-    context.textAlign = "right";
-    setFont(Math.max(13, 20 * area.scale), 800);
+    context.textAlign = line.labelAlign;
+    setFont(line.fontSize, 800);
     context.fillText(line.label, 0, 0);
     context.restore();
   });
