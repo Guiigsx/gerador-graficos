@@ -1,3 +1,5 @@
 node_modules/
 .sites-runtime/
+.vercel/
+.env*
 .DS_Store
