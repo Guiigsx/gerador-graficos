@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Crie, personalize e exporte graficos em PNG.">
+    <title>Estudio de Graficos</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand" aria-label="Estudio de Graficos">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Estudio de Graficos</span>
+      </div>
+      <div class="top-actions">
+        <span class="live-status" id="live-status" role="status">Previa atualizada</span>
+        <button class="button button-quiet" id="reset-chart" type="button">Restaurar exemplo</button>
+        <button class="button button-primary" id="download-chart" type="button">
+          <span aria-hidden="true">↓</span> Baixar PNG
+        </button>
+      </div>
+    </header>
+
+    <main class="studio">
+      <aside class="editor" aria-label="Opcoes do grafico">
+        <section class="editor-section type-section" aria-labelledby="type-heading">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">01</span>
+              <h1 id="type-heading">Tipo de grafico</h1>
+            </div>
+          </div>
+          <div class="type-picker" id="type-picker" role="radiogroup" aria-label="Tipo de grafico">
+            <button class="type-option is-active" type="button" data-type="bar" role="radio" aria-checked="true"><span class="type-icon bars" aria-hidden="true"></span>Barras</button>
+            <button class="type-option" type="button" data-type="horizontalBar" role="radio" aria-checked="false"><span class="type-icon hbars" aria-hidden="true"></span>Horizontal</button>
+            <button class="type-option" type="button" data-type="line" role="radio" aria-checked="false"><span class="type-icon line" aria-hidden="true"></span>Linha</button>
+            <button class="type-option" type="button" data-type="pie" role="radio" aria-checked="false"><span class="type-icon pie" aria-hidden="true"></span>Pizza</button>
+            <button class="type-option" type="button" data-type="doughnut" role="radio" aria-checked="false"><span class="type-icon doughnut" aria-hidden="true"></span>Rosca</button>
+          </div>
+        </section>
+
+        <details class="editor-section" open>
+          <summary><span><b class="eyebrow">02</b> Conteudo</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="section-body form-stack">
+            <label class="field field-wide">Titulo
+              <input id="chart-title" data-field="title" type="text" value="RESISTENCIA INDIVIDUAL A COMPRESSAO - LOTE 5">
+            </label>
+            <label class="field field-wide">Subtitulo
+              <input id="chart-subtitle" data-field="subtitle" type="text" placeholder="Opcional">
+            </label>
+            <div class="field-grid">
+              <label class="field">Unidade
+                <input data-field="unit" type="text" value="MPa" placeholder="Ex.: MPa">
+              </label>
+              <label class="field">Casas decimais
+                <input data-field="decimals" type="number" min="0" max="3" step="1" value="1">
+              </label>
+            </div>
+            <label class="field field-wide">Fonte dos dados
+              <input data-field="source" type="text" placeholder="Opcional">
+            </label>
+          </div>
+        </details>
+
+        <details class="editor-section" open>
+          <summary><span><b class="eyebrow">03</b> Aparencia</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="section-body form-stack">
+            <div class="field-grid">
+              <label class="field">Fonte
+                <select data-field="font">
+                  <option value="Arial">Arial</option>
+                  <option value="Calibri">Calibri</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="Inter">Inter</option>
+                  <option value="Verdana">Verdana</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                </select>
+              </label>
+              <label class="field">Formato
+                <select id="chart-size">
+                  <option value="1600x900">Paisagem 16:9</option>
+                  <option value="1400x1050">Paisagem 4:3</option>
+                  <option value="1080x1080">Quadrado</option>
+                  <option value="1080x1350">Retrato 4:5</option>
+                </select>
+              </label>
+            </div>
+            <div class="color-grid">
+              <label class="color-field"><input data-field="primaryColor" type="color" value="#137fbd"><span>Serie</span></label>
+              <label class="color-field"><input data-field="backgroundColor" type="color" value="#ffffff"><span>Fundo</span></label>
+              <label class="color-field"><input data-field="textColor" type="color" value="#5f6669"><span>Texto</span></label>
+              <label class="color-field"><input data-field="gridColor" type="color" value="#dfe4e5"><span>Grade</span></label>
+              <label class="color-field"><input data-field="averageColor" type="color" value="#082a4b"><span>Media</span></label>
+              <label class="color-field"><input data-field="referenceColor" type="color" value="#f47b20"><span>Referencia</span></label>
+            </div>
+            <div class="toggle-grid">
+              <label class="toggle"><input data-flag="showLegend" type="checkbox" checked><span></span>Mostrar legenda</label>
+              <label class="toggle"><input data-flag="showDataLabels" type="checkbox" checked><span></span>Valores nos dados</label>
+            </div>
+          </div>
+        </details>
+
+        <details class="editor-section cartesian-only" open>
+          <summary><span><b class="eyebrow">04</b> Linhas de referencia</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="section-body form-stack">
+            <div class="reference-row">
+              <label class="toggle"><input data-flag="showAverage" type="checkbox" checked><span></span>Media dos dados</label>
+              <input data-field="averageLabel" type="text" value="Media do lote" aria-label="Legenda da media">
+            </div>
+            <div class="reference-row reference-row-value">
+              <label class="toggle"><input data-flag="showReference" type="checkbox" checked><span></span>Valor esperado</label>
+              <input data-field="referenceLabel" type="text" value="FCK esperado" aria-label="Legenda do valor esperado">
+              <input data-field="referenceValue" type="text" inputmode="decimal" value="35" aria-label="Valor esperado">
+            </div>
+            <label class="field field-small">Maximo do eixo <span class="optional">automatico se vazio</span>
+              <input data-field="yMax" type="text" inputmode="decimal" value="50">
+            </label>
+          </div>
+        </details>
+
+        <details class="editor-section data-section" open>
+          <summary><span><b class="eyebrow">05</b> Dados</span><span class="data-count" id="data-count">6 itens</span><span class="chevron" aria-hidden="true"></span></summary>
+          <div class="section-body">
+            <div class="data-table-head" aria-hidden="true"><span>Rotulo</span><span>Valor</span><span>Cor</span><span></span></div>
+            <div class="data-list" id="data-list"></div>
+            <button class="add-row" id="add-row" type="button"><span aria-hidden="true">+</span> Adicionar dado</button>
+            <details class="bulk-entry">
+              <summary>Colar varios dados</summary>
+              <label class="field">Um item por linha, no formato rotulo;valor
+                <textarea id="bulk-data" rows="5" placeholder="P01;32,5&#10;P02;33,4&#10;P03;37,2"></textarea>
+              </label>
+              <button class="button button-secondary" id="apply-bulk" type="button">Aplicar dados</button>
+            </details>
+          </div>
+        </details>
+      </aside>
+
+      <section class="preview-panel" aria-labelledby="preview-title">
+        <div class="preview-head">
+          <div>
+            <span class="eyebrow">PREVIA</span>
+            <h2 id="preview-title">Imagem final</h2>
+          </div>
+          <span class="canvas-size" id="canvas-size-label">1600 × 900 px</span>
+        </div>
+        <div class="canvas-stage">
+          <canvas id="chart-canvas" width="1600" height="900" aria-label="Previa do grafico"></canvas>
+        </div>
+        <div class="preview-footer">
+          <p>O arquivo sera salvo em PNG com a resolucao selecionada.</p>
+          <button class="button button-primary mobile-download" id="mobile-download" type="button"><span aria-hidden="true">↓</span> Baixar PNG</button>
+        </div>
+      </section>
+    </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
